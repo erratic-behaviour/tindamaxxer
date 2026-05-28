@@ -6,8 +6,6 @@ interface AppContextType {
   setTotalBudget: (budget: number) => void;
   categories: Category[];
   setCategories: (categories: Category[]) => void;
-  currentList: UserList | null;
-  setCurrentList: (list: UserList | null) => void;
   savedLists: UserList[];
   saveList: (list: UserList) => void;
   recommendations: PurchaseRecommendation[];
@@ -17,61 +15,37 @@ interface AppContextType {
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [totalBudget, setTotalBudget] = useState<number>(10000);
+  const [totalBudget, setTotalBudget] = useState<number>(0);
+
+  // Start with one empty category so the UI isn't blank
   const [categories, setCategories] = useState<Category[]>([
     {
       id: '1',
-      name: 'Bathing Essentials',
-      percentage: 20,
-      subCategories: [
-        { id: '1-1', name: 'Shampoo', percentage: 30, brandSplit: [50, 30, 20], topNBrands: 3 },
-        { id: '1-2', name: 'Soap', percentage: 40, brandSplit: [60, 40], topNBrands: 2 },
-        { id: '1-3', name: 'Conditioner', percentage: 30, brandSplit: [70, 30], topNBrands: 2 },
-      ],
-    },
-    {
-      id: '2',
-      name: 'Canned Goods',
-      percentage: 25,
-      subCategories: [
-        { id: '2-1', name: 'Sardines', percentage: 50, brandSplit: [40, 30, 20, 10], topNBrands: 4 },
-        { id: '2-2', name: 'Corned Beef', percentage: 50, brandSplit: [50, 30, 20], topNBrands: 3 },
-      ],
-    },
-    {
-      id: '3',
-      name: 'Snacks',
-      percentage: 30,
-      subCategories: [
-        { id: '3-1', name: 'Chips', percentage: 60, brandSplit: [50, 50], topNBrands: 2 },
-        { id: '3-2', name: 'Biscuits', percentage: 40, brandSplit: [60, 40], topNBrands: 2 },
-      ],
-    },
-    {
-      id: '4',
-      name: 'Rice & Staples',
-      percentage: 25,
-      subCategories: [
-        { id: '4-1', name: 'Rice', percentage: 100, brandSplit: [100], topNBrands: 1 },
-      ],
+      name: 'General',
+      percentage: 100,
+      subCategories: [],
     },
   ]);
-  const [currentList, setCurrentList] = useState<UserList | null>(null);
+
   const [savedLists, setSavedLists] = useState<UserList[]>([]);
   const [recommendations, setRecommendations] = useState<PurchaseRecommendation[]>([]);
 
   const saveList = (list: UserList) => {
-    setSavedLists([...savedLists, list]);
+    setSavedLists(prev => [list, ...prev]);
   };
 
   return (
-    <AppContext.Provider value={{
-      totalBudget, setTotalBudget,
-      categories, setCategories,
-      currentList, setCurrentList,
-      savedLists, saveList,
-      recommendations, setRecommendations,
-    }}>
+    <AppContext.Provider
+      value={{
+        totalBudget,
+        setTotalBudget,
+        categories,
+        setCategories,
+        savedLists,
+        saveList,
+        recommendations,
+        setRecommendations,
+      }}>
       {children}
     </AppContext.Provider>
   );

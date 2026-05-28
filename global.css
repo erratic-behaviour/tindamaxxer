@@ -1,4 +1,16 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-/* Cache busting comment - forces NativeWind to rebuild! */
+
+/* ─── Web scroll fix ────────────────────────────────────────────────
+   Expo sets body { overflow: hidden } in its injected reset style,
+   which kills ScrollView on web. These two rules undo that.
+   They have no effect on native (CSS is web-only).
+─────────────────────────────────────────────────────────────────── */
+body {
+  overflow: auto !important;
+}
+#root {
+  overflow: auto !important;
+  height: 100% !important;
+}

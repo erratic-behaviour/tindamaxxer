@@ -1,89 +1,82 @@
-import { Product, Category, PurchaseRecommendation } from '../types';
-
-// Notice we have a LOT of shampoos now. The algorithm must filter this down.
-export const mockProducts: Product[] = [
-  // Shampoos
-  { id: 'p1', name: 'Sunsilk Pink', brand: 'Sunsilk', category: 'Bathing Essentials', subCategory: 'Shampoo', costPrice: 6.0, sellingPrice: 8.0, unitsSold: 120 },
-  { id: 'p2', name: 'Palmolive Green', brand: 'Palmolive', category: 'Bathing Essentials', subCategory: 'Shampoo', costPrice: 5.5, sellingPrice: 7.0, unitsSold: 95 },
-  { id: 'p3', name: 'Head & Shoulders', brand: 'H&S', category: 'Bathing Essentials', subCategory: 'Shampoo', costPrice: 7.0, sellingPrice: 10.0, unitsSold: 150 }, // High profit, high volume
-  { id: 'p4', name: 'Clear Men', brand: 'Clear', category: 'Bathing Essentials', subCategory: 'Shampoo', costPrice: 7.5, sellingPrice: 9.0, unitsSold: 40 }, // Bad ratio, low volume (Will be ignored)
-  { id: 'p5', name: 'Creamsilk', brand: 'Creamsilk', category: 'Bathing Essentials', subCategory: 'Shampoo', costPrice: 6.5, sellingPrice: 8.5, unitsSold: 110 },
-  { id: 'p6', name: 'Rejoice', brand: 'Rejoice', category: 'Bathing Essentials', subCategory: 'Shampoo', costPrice: 5.0, sellingPrice: 6.5, unitsSold: 80 },
-  
-  // Sardines
-  { id: 's1', name: '555 Sardines', brand: '555', category: 'Canned Goods', subCategory: 'Sardines', costPrice: 18.0, sellingPrice: 24.0, unitsSold: 200 },
-  { id: 's2', name: 'Ligo Sardines', brand: 'Ligo', category: 'Canned Goods', subCategory: 'Sardines', costPrice: 19.0, sellingPrice: 24.5, unitsSold: 180 },
-  { id: 's3', name: 'Mega Sardines', brand: 'Mega', category: 'Canned Goods', subCategory: 'Sardines', costPrice: 20.0, sellingPrice: 26.0, unitsSold: 210 },
-  { id: 's4', name: 'Saba Sardines', brand: 'Saba', category: 'Canned Goods', subCategory: 'Sardines', costPrice: 17.5, sellingPrice: 21.0, unitsSold: 50 }, // Will be ignored
-];
+import { Category, PurchaseRecommendation } from '../types';
 
 /**
- * CORE DAA ALGORITHM: Greedy Filter + Fractional Knapsack
+ * CORE ALGORITHM: Greedy Fractional Knapsack with Top-N Brand Splits
+ *
+ * How it works per subcategory:
+ * 1. Score every product by: (profitPerUnit * unitsSold) / costPrice
+ *    — This gives a "value density" that factors in BOTH margin AND demand.
+ *    A product that barely sells has low real value even with good margins.
+ * 2. Sort descending by score (greedy sort, O(n log n))
+ * 3. Take only the top N products (user-defined)
+ * 4. Allocate the subcategory budget to those top N using the user's split %
+ *    e.g. Rank 1 gets 50%, Rank 2 gets 30%, Rank 3 gets 20%
+ * 5. For each allocation: floor(budget_for_brand / costPrice) = units to buy
  */
 function optimizeSubCategory(
-  availableProducts: Product[],
+  categoryName: string,
+  subCatName: string,
   subCatBudget: number,
-  brandSplitConstraints: number[], // e.g., [50, 30, 20]
-  topN: number // e.g., 3
+  products: { id: string; name: string; costPrice: number; sellingPrice: number; unitsSold: number }[],
+  topNBrands: number,
+  brandSplit: number[] // must sum to 100, length === topNBrands
 ): PurchaseRecommendation[] {
-  const recommendations: PurchaseRecommendation[] = [];
+  if (products.length === 0 || subCatBudget <= 0) return [];
 
-  // 1. EVALUATION (Calculate Knapsack Ratios)
-  const evaluatedItems = availableProducts.map(product => {
+  // Step 1: Score products
+  const scored = products.map(product => {
     const profitPerUnit = product.sellingPrice - product.costPrice;
-    
-    // Secret Sauce: We multiply profit by demand (unitsSold) to get TRUE value.
-    // High profit but 0 sales = 0 Value.
-    const expectedValue = profitPerUnit * product.unitsSold; 
-    const knapsackRatio = expectedValue / product.costPrice;
-
-    return { product, ratio: knapsackRatio, profitPerUnit };
+    // Value density = how much profit-weighted demand you get per peso spent
+    const score = (profitPerUnit * product.unitsSold) / product.costPrice;
+    return { product, profitPerUnit, score };
   });
 
-  // 2. GREEDY SORT & FILTER (O(N log N))
-  // Sort by highest ratio first
-  evaluatedItems.sort((a, b) => b.ratio - a.ratio);
-  
-  // Isolate only the Top N brands (Discard the rest of the database)
-  const topBrands = evaluatedItems.slice(0, topN);
+  // Step 2: Greedy sort
+  scored.sort((a, b) => b.score - a.score);
 
-  // 3. FRACTIONAL KNAPSACK ALLOCATION
+  // Step 3: Take top N (or fewer if not enough products)
+  const actualN = Math.min(topNBrands, scored.length, brandSplit.length);
+  const topBrands = scored.slice(0, actualN);
+
+  // Step 4 & 5: Allocate and calculate units
+  const recommendations: PurchaseRecommendation[] = [];
+
   topBrands.forEach((item, index) => {
-    // Get the constraint percentage for this rank (Rank 1 gets 50%, Rank 2 gets 30%, etc)
-    const constraintPercentage = brandSplitConstraints[index] || 0;
-    let budgetForThisBrand = subCatBudget * (constraintPercentage / 100);
+    const splitPercent = brandSplit[index] ?? 0;
+    const budgetForBrand = subCatBudget * (splitPercent / 100);
 
-    if (budgetForThisBrand > 0) {
-      // Calculate how many pieces we can afford
-      const exactUnits = budgetForThisBrand / item.product.costPrice;
-      const unitsToBuy = Math.floor(exactUnits); 
-      
-      const cost = unitsToBuy * item.product.costPrice;
-      const expectedProfit = unitsToBuy * item.profitPerUnit;
+    if (budgetForBrand <= 0) return;
 
-      if (unitsToBuy > 0) {
-        recommendations.push({
-          product: item.product,
-          unitsToBuy,
-          cost,
-          expectedProfit
-        });
-      }
-    }
+    const unitsToBuy = Math.floor(budgetForBrand / item.product.costPrice);
+    if (unitsToBuy <= 0) return;
+
+    const totalCost = unitsToBuy * item.product.costPrice;
+    const expectedProfit = unitsToBuy * item.profitPerUnit;
+
+    recommendations.push({
+      productName: item.product.name,
+      subCategoryName: subCatName,
+      categoryName,
+      unitsToBuy,
+      costPerUnit: item.product.costPrice,
+      totalCost,
+      expectedProfit,
+      rank: index + 1,
+    });
   });
 
   return recommendations;
 }
 
 /**
- * WRAPPER: Tree Traversal
+ * WRAPPER: Traverses the Category → SubCategory → Products tree
+ * and runs the knapsack on each subcategory node.
  */
 export function runHierarchicalOptimization(
   totalBudget: number,
-  categories: Category[],
-  allDatabaseProducts: Product[]
+  categories: Category[]
 ): PurchaseRecommendation[] {
-  let allRecommendations: PurchaseRecommendation[] = [];
+  const allRecommendations: PurchaseRecommendation[] = [];
 
   categories.forEach(category => {
     const categoryBudget = totalBudget * (category.percentage / 100);
@@ -91,18 +84,16 @@ export function runHierarchicalOptimization(
     category.subCategories.forEach(subCat => {
       const subCatBudget = categoryBudget * (subCat.percentage / 100);
 
-      const productsInThisSubCat = allDatabaseProducts.filter(
-        p => p.category === category.name && p.subCategory === subCat.name
+      const results = optimizeSubCategory(
+        category.name,
+        subCat.name,
+        subCatBudget,
+        subCat.products,
+        subCat.topNBrands,
+        subCat.brandSplit
       );
 
-      const optimalPurchases = optimizeSubCategory(
-        productsInThisSubCat, 
-        subCatBudget, 
-        subCat.brandSplit,
-        subCat.topNBrands
-      );
-
-      allRecommendations = [...allRecommendations, ...optimalPurchases];
+      allRecommendations.push(...results);
     });
   });
 
