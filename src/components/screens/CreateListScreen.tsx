@@ -1,4 +1,5 @@
-﻿import React, { useState } from 'react';
+﻿
+import React, { useState } from 'react';
 import { View, Text, ScrollView } from 'react-native';
 import { useApp } from '../../context/AppContext';
 import { Button } from '../ui/Button';
@@ -14,21 +15,19 @@ export const CreateListScreen = ({ navigation }: any) => {
   };
 
   return (
-    <ScrollView className="flex-1 bg-gray-100 p-4">
-      <View className="bg-white rounded-lg p-6 shadow-sm">
-        <Text className="text-xl font-bold text-gray-800 mb-2">Enter Your Budget</Text>
-        <Text className="text-gray-500 mb-4">How much capital do you want to allocate for inventory restock?</Text>
-        
-        <Input 
-          label="Total Budget (₱)" 
-          value={budget} 
-          onChangeText={setBudget} 
-          keyboardType="numeric" 
-          placeholder="e.g. 10000" 
-        />
-        
-        <Button title="Next: Configure Categories" onPress={handleNext} />
-      </View>
-    </ScrollView>
+    /* NUCLEAR WEB SCROLL FIX: Strict 100vh wrapper layout */
+    <View style={{ flex: 1, height: '100vh', backgroundColor: '#f8fafc' }}>
+      <ScrollView 
+        style={{ flex: 1 }}
+        contentContainerStyle={{ flexGrow: 1, padding: 20, paddingBottom: 100 }}
+        showsVerticalScrollIndicator={false}
+      >
+        <View className="bg-white rounded-lg p-6 shadow-sm">
+          <Text className="text-xl font-bold text-gray-800 mb-4">Enter Your Budget</Text>
+          <Input label="Total Budget (₱)" value={budget} onChangeText={setBudget} keyboardType="numeric" placeholder="Enter amount" />
+          <Button title="Next: Configure Categories" onPress={handleNext} />
+        </View>
+      </ScrollView>
+    </View>
   );
 };
